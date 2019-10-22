@@ -1,6 +1,7 @@
 from gpiozero import Motor
 from time import sleep
 import asyncio
+from threading import RLock
 
 class MotorCtrl:
     def __init__(self):
@@ -10,8 +11,11 @@ class MotorCtrl:
         self.motor4 = Motor(23, 24)
         self.motors = (None, self.motor1, self.motor2, self.motor3, self.motor4)
         self.loop = asyncio.get_event_loop()
+        # 创建一个多线程锁
+        self.lock = RLock()
 
     def MoveMotor(self, num, direc, time):
+        self.lock.acquire()
         self.motors[num].stop()
         if direc:
             self.motors[num].forward()
@@ -19,9 +23,10 @@ class MotorCtrl:
             self.motors[num].backward()
         sleep(time)
         self.motors[num].stop()
+        self.lock.release()
 
     async def asyncMoveMotor(self, num, direc):
-        times = {1:1.5, 2:1.55, 3:1.58, 4:1.52}
+        times = {1:2, 2:2, 3:2, 4:2}
         self.motors[num].stop()
         if direc:
             self.motors[num].forward()
@@ -30,7 +35,7 @@ class MotorCtrl:
         await asyncio.sleep(times[num])
         self.motors[num].stop()
     
-    # 垃圾类别id，-1：未识别； 0：干垃圾； 1： 湿垃圾； 2：有害； 3：可回收'
+    # 垃圾类别id，-1:'未识别', 0:'可回收垃圾', 1:'有害垃圾', 2:'湿垃圾', 3:'干垃圾'
     def MovePan(self, types):
         tasks = []
         if types == 0:
@@ -55,9 +60,9 @@ class MotorCtrl:
             tasks.append(self.asyncMoveMotor(4, 1))
         else:
             return
-
         self.loop.run_until_complete(asyncio.wait(tasks))
 
+    # 平板复原
     def MovePanFlat(self, types):
         tasks = []
         if types == 0:
@@ -82,9 +87,9 @@ class MotorCtrl:
             tasks.append(self.asyncMoveMotor(4, 0))
         else:
             return
-
         self.loop.run_until_complete(asyncio.wait(tasks))
 
+    # 所有同时移动
     def allMove(self, dirc):
         tasks = []
         tasks.append(self.asyncMoveMotor(1, dirc))
@@ -93,32 +98,34 @@ class MotorCtrl:
         tasks.append(self.asyncMoveMotor(4, dirc))
         self.loop.run_until_complete(asyncio.wait(tasks))
     
+    # 具体垃圾信息
     def Garbge(self, types):
+        self.lock.acquire()
         self.MovePan(types)
         sleep(1)
         self.MovePanFlat(types)
         # 板子平衡问题  需要加一些补偿
         if types == 0:
-            self.MoveMotor(1, 1, 0.02)
-            self.MoveMotor(2, 1, 0.05)
-            self.MoveMotor(3, 1, 0.06)
-            self.MoveMotor(4, 1, 0.03)
+            self.MoveMotor(1, 1, 0.06)
+            self.MoveMotor(2, 1, 0.10)
+            self.MoveMotor(3, 1, 0.12)
+            self.MoveMotor(4, 1, 0.07)
         elif types == 1:
-            self.MoveMotor(1, 1, 0.02)
-            self.MoveMotor(2, 1, 0.05)
-            self.MoveMotor(3, 1, 0.07)
-            self.MoveMotor(4, 1, 0.04)
+            self.MoveMotor(1, 1, 0.06)
+            self.MoveMotor(2, 1, 0.10)
+            self.MoveMotor(3, 1, 0.12)
+            self.MoveMotor(4, 1, 0.10)
         elif types == 2:
-            self.MoveMotor(1, 1, 0.02)
-            self.MoveMotor(2, 1, 0.03)
-            self.MoveMotor(3, 1, 0.05)
-            self.MoveMotor(4, 1, 0.05)
+            self.MoveMotor(1, 1, 0.06)
+            self.MoveMotor(2, 1, 0.08)
+            self.MoveMotor(3, 1, 0.12)
+            self.MoveMotor(4, 1, 0.12)
         elif types == 3:
-            self.MoveMotor(1, 1, 0.02)
-            self.MoveMotor(2, 1, 0.02)
-            self.MoveMotor(3, 1, 0.04)
-            self.MoveMotor(4, 1, 0.05)
-
+            self.MoveMotor(1, 1, 0.06)
+            self.MoveMotor(2, 1, 0.06)
+            self.MoveMotor(3, 1, 0.10)
+            self.MoveMotor(4, 1, 0.12)
+        self.lock.release()
 
 
 motor = MotorCtrl()
